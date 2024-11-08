@@ -1,181 +1,145 @@
-# Azure-Agent
-### Detailed Documentation
 
-This project is a Streamlit-based web app that allows users to interact with a PDF document via a conversational interface powered by Azure OpenAI and Azure Cognitive Search. Below is a breakdown of the key components and functionality of the code.
+# Clinical Trial Chatbot with Azure OpenAI and Azure Search
 
----
+This project allows users to chat with a PDF document (e.g., clinical trial protocols) using Azure OpenAI's GPT-3.5-turbo model and Azure Cognitive Search. The PDF is processed, indexed, and stored in Azure Cognitive Search, enabling semantic search based on the content. The chatbot generates responses based on user queries using contextual information from the PDF document.
 
-### 1. **Environment Setup**
+## Features
 
-```python
-import os
-import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from azure.search.documents import SearchClient
-from azure.search.documents.indexes import SearchIndexClient
-from azure.search.documents.indexes.models import SearchIndex, SimpleField, SearchableField, SearchField, VectorSearch, VectorSearchProfile, HnswAlgorithmConfiguration
-from azure.core.credentials import AzureKeyCredential
-from azure.identity import DefaultAzureCredential
-from azure.search.documents.models import VectorizedQuery
-import openai
-from openai import AzureOpenAI
-from dotenv import load_dotenv
-import PyPDF2
+- **PDF Text Extraction**: Extracts text from a PDF document using `PyPDF2`.
+- **Text Chunking**: Splits large PDF content into manageable chunks using `langchain.text_splitter`.
+- **Azure Search Indexing**: Creates an Azure Search index and indexes text chunks with embeddings.
+- **Semantic Search**: Uses embeddings to perform semantic search and retrieve relevant chunks.
+- **Chat with GPT-3.5**: Uses Azure OpenAI's GPT-3.5-turbo model to generate responses based on the search results.
+
+## Technologies Used
+
+- **Azure Cognitive Search**: For indexing and searching PDF content.
+- **Azure OpenAI**: For generating embeddings and responses.
+- **Streamlit**: For creating the web-based chat interface.
+- **PyPDF2**: For extracting text from PDF files.
+- **LangChain**: For splitting long text into chunks.
+- **OpenAI's GPT-3.5-turbo**: For generating responses based on user queries.
+
+## Requirements
+
+- Python 3.7+
+- `streamlit`
+- `langchain`
+- `azure-search-documents`
+- `azure-identity`
+- `openai`
+- `PyPDF2`
+- `python-dotenv`
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/PraneethVenkata/Internal-projects.git
+cd Internal-projects
 ```
 
-**Explanation:**
-- **Environment Variables**: `load_dotenv()` loads Azure credentials and keys from a `.env` file for use throughout the script.
-- **Packages**: This imports necessary packages including `Streamlit`, Azure Search clients, Langchain for text chunking, and PyPDF2 for extracting PDF content.
+### 2. Set Up Environment Variables
 
----
+Create a `.env` file in the root directory of your project with the following values:
 
-### 2. **Environment Variables Setup**
-
-```python
-# Load environment variables
-load_dotenv()
-
-# Azure OpenAI and Azure Search credentials
-SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
-SEARCH_ADMIN_KEY = os.getenv("AZURE_SEARCH_ADMIN_KEY")
-azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-azure_openai_key = os.getenv("AZURE_OPENAI_API_KEY")
-azure_openai_version = os.getenv('API_VERSION')
-azure_openai_embedding_deployment = "text-embedding-ada-002"
-azure_openai_chat_model = "gpt-35-turbo"
+```env
+AZURE_SEARCH_ENDPOINT="your-azure-search-endpoint"
+AZURE_SEARCH_ADMIN_KEY="your-azure-search-admin-key"
+AZURE_OPENAI_ENDPOINT="your-azure-openai-endpoint"
+AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
+API_VERSION="your-azure-openai-api-version"  # e.g., '2023-05-15'
 ```
 
-**Explanation:**
-- The environment variables, such as the Azure Search and OpenAI credentials, are fetched from the `.env` file. These variables are essential for connecting to the Azure services.
-- **Embedding Models**: The Azure OpenAI models are defined (`text-embedding-ada-002` for embeddings and `gpt-35-turbo` for chat completions).
+Replace the values above with your own Azure Search and OpenAI credentials.
 
----
+### 3. Install Dependencies
 
-### 3. **PDF Extraction and Text Chunking**
+Use `pip` to install the required Python libraries:
 
-#### PDF Extraction:
-```python
-@st.cache_data
-def extract_text_from_pdf(pdf_path):
-    text = ""
-    with open(pdf_path, "rb") as file:
-        reader = PyPDF2.PdfReader(file)
-        for page in reader.pages:
-            text += page.extract_text() or ""
-    return text
-```
-- **`extract_text_from_pdf()`**: Extracts raw text from the provided PDF file using PyPDF2. The text is read page by page and returned as a concatenated string.
-
-#### Text Chunking:
-```python
-@st.cache_data
-def get_text_chunks(pdf_text):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    chunks = text_splitter.split_text(pdf_text)
-    return chunks
-```
-- **`get_text_chunks()`**: Splits the extracted text into smaller, manageable chunks using Langchain's `RecursiveCharacterTextSplitter`. This prepares the text for vectorization and indexing.
-
----
-
-### 4. **Azure Cognitive Search Index Management**
-
-#### Create Index:
-```python
-def create_index():
-    index_client = SearchIndexClient(SEARCH_ENDPOINT, AzureKeyCredential(SEARCH_ADMIN_KEY))
-    # ...
+```bash
+pip install -r requirements.txt
 ```
 
-- **`create_index()`**: This function sets up a vectorized search index in Azure Cognitive Search.
-- **Fields and Vector Search**: The index is created with fields like `id`, `fileName`, `content`, and `contentEmbeddings`. `contentEmbeddings` stores the vector embeddings of the text.
-- **Vector Search**: Uses HnswAlgorithm for approximate nearest neighbor searches.
+The `requirements.txt` should include:
 
----
-
-### 5. **Document Indexing in Azure Cognitive Search**
-
-```python
-def index_documents_to_azure_search(text_chunks):
-    client = AzureOpenAI(
-        azure_deployment=azure_openai_embedding_deployment,
-        azure_endpoint=azure_openai_endpoint,
-        api_key=azure_openai_key,
-        azure_ad_token_provider=DefaultAzureCredential() if not azure_openai_key else None,
-        api_version=azure_openai_version
-    )
-    # ...
+```
+streamlit
+langchain
+azure-search-documents
+azure-identity
+openai
+PyPDF2
+python-dotenv
 ```
 
-- **`index_documents_to_azure_search()`**: This function loops through the text chunks and generates embeddings for each using the Azure OpenAI service. The embeddings are then indexed into Azure Cognitive Search for future retrieval.
-- **Uploading Documents**: The embeddings and the content chunks are uploaded to the Azure Search index.
+### 4. Download the PDF
 
----
-
-### 6. **Embedding-based Search Query**
+Ensure that the PDF you want to process (`DNDi-Clinical-Trial-Protocol-BENDITA-V5.pdf`) is in the specified path (or update the path in the code):
 
 ```python
-def search_embeddings(user_question):
-    client_search = SearchClient(endpoint=SEARCH_ENDPOINT, index_name=SEARCH_INDEX_NAME, credential=AzureKeyCredential(SEARCH_ADMIN_KEY))
-    # Generate embeddings for the user's question using Azure OpenAI
-    # ...
+PDF_PATH = r"C:\path\to\your\pdf\DNDi-Clinical-Trial-Protocol-BENDITA-V5.pdf"
 ```
 
-- **`search_embeddings()`**: 
-  - Takes a user question, generates its embeddings using the OpenAI `text-embedding-ada-002` model, and performs a vector search on the `contentEmbeddings` field in Azure Cognitive Search.
-  - Returns the top 3 relevant chunks based on nearest neighbors.
+### 5. Run the Application
 
----
+Once everything is set up, you can start the Streamlit app by running:
 
-### 7. **Generating Responses with GPT-35-turbo**
-
-```python
-def get_chat_response(user_question):
-    search_results = search_embeddings(user_question)
-    prompt = """
-        Answer the question as detailed as possible from the provided context, make sure to provide all the details. 
-        If the answer is not in the provided context, just say, "answer is not available in the context", don't provide the wrong answer.\n\n
-        Answer:
-    """
-    # Use search results to generate a response...
+```bash
+streamlit run app.py
 ```
 
-- **`get_chat_response()`**: After performing a vector search based on the user question, this function constructs a prompt using the retrieved content. It then uses the `gpt-35-turbo` model to generate a detailed response to the user's query.
-- If the relevant information is found in the search results, it is added to the prompt for GPT-3 to generate a response. Otherwise, it defaults to a message that the answer isn't available.
+This will open a local development server where you can interact with the PDF document through a chatbot interface.
 
----
+## How It Works
 
-### 8. **Streamlit Front-End**
+1. **Text Extraction**:
+   - The PDF is read using `PyPDF2`, and the content is extracted from each page.
+   - The raw text is processed into smaller chunks for easier indexing.
 
-```python
-def main():
-    st.header("Chat with PDF using Azure OpenAI GPT-35-turbo")
-    user_question = st.text_input("Ask a question based on the PDF content")
-    # ...
-```
+2. **Index Creation**:
+   - An index is created in Azure Cognitive Search if it doesn't already exist.
+   - The index includes fields for document `id`, `fileName`, `content`, and `contentEmbeddings` (which are vector embeddings).
 
-- **Streamlit UI**: The app is configured with a simple text input for user questions. It displays chat history and processes new questions via the `get_chat_response()` function.
-- **Index Creation**: If the search index does not exist, the app processes the PDF file, chunks the text, creates the index, and uploads the chunks into Azure Cognitive Search.
+3. **Embeddings and Indexing**:
+   - Each chunk of text is embedded using the `text-embedding-ada-002` model from Azure OpenAI.
+   - The embeddings are then uploaded to Azure Search, where they are stored alongside the text content.
 
----
+4. **Search and Response**:
+   - When the user asks a question, the question is converted into embeddings and used to search for relevant chunks in the indexed document.
+   - The chatbot uses GPT-3.5 to generate a response based on the search results, which are displayed to the user.
 
-### 9. **Main Workflow Execution**
+## Components Breakdown
 
-```python
-if __name__ == "__main__":
-    main()
-```
-- **Execution**: The `main()` function is the entry point of the Streamlit app, allowing the user to interact with the PDF and ask questions in a conversational manner.
+### `extract_text_from_pdf(pdf_path)`
+Extracts text from the specified PDF file using `PyPDF2`.
 
----
+### `get_text_chunks(pdf_text)`
+Splits the extracted text into smaller chunks using `RecursiveCharacterTextSplitter` from LangChain.
 
-### Conclusion
+### `create_index()`
+Creates an Azure Cognitive Search index if it doesn't already exist, defining fields like `id`, `fileName`, and `content`.
 
-This code demonstrates how to build a PDF-based conversational AI interface using Azure OpenAI for embeddings and GPT-based responses, combined with Azure Cognitive Search for vector-based search. The core functionalities include:
-- Extracting and chunking PDF text.
-- Setting up a vector search index in Azure Cognitive Search.
-- Generating vector embeddings for both content and queries.
-- Retrieving relevant content and generating responses using OpenAI's GPT model.
-- A simple UI using Streamlit to interact with the system.
+### `index_documents_to_azure_search(text_chunks)`
+Generates embeddings for each text chunk using Azure OpenAI and indexes them in Azure Search.
 
-This setup is ideal for querying large documents (e.g., clinical trials, research papers) and getting answers based on pre-indexed content.
+### `search_embeddings(user_question)`
+Generates embeddings for the user question and uses Azure Search to find relevant document chunks.
+
+### `get_chat_response(user_question)`
+Combines the search results with a prompt for GPT-3.5-turbo to generate a response based on the context provided by the search results.
+
+### `main()`
+The Streamlit interface that allows users to interact with the application. It handles chat history and user input.
+
+## Contributing
+
+Feel free to fork this project, make improvements, or suggest features! If you want to contribute, please follow these steps:
+
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature-branch`)
+3. Make your changes and commit them (`git commit -m 'Add new feature'`)
+4. Push to your branch (`git push origin feature-branch`)
+5. Create a pull request
+
